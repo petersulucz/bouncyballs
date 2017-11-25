@@ -18,11 +18,11 @@ class QuadTree
         return this.root;
     }
 
-    add(component : IGameComponent){
-
+    add(component : IPhysicsObject){
+        
     }
 
-    private getFittingNode(component : IGameComponent) : QuadTreeNode{
+    private getFittingNode(component : IPhysicsObject) : QuadTreeNode{
         let bounds = component.getBounds()
         return null;
     }
@@ -30,26 +30,54 @@ class QuadTree
 
 class QuadTreeNode
 {
-    public topLeft : QuadTreeNode;
-    public topRight : QuadTreeNode;
-    public bottomLeft : QuadTreeNode;
-    public bottomRight : QuadTreeNode;
-    public readonly topLeftBound : Vector;
-    public readonly topRightBound : Vector;
+    private topLeft : QuadTreeNode;
+    private topRight : QuadTreeNode;
+    private bottomLeft : QuadTreeNode;
+    private bottomRight : QuadTreeNode;
+    private cells : Array<QuadTreeNode>;
 
-    constructor(topLeftBound : Vector, topRightBound : Vector){
+    public readonly topLeftBound : Vector;
+    public readonly bottomRightBound : Vector;
+    public readonly centerBound : Vector;
+
+    constructor(topLeftBound : Vector, bottomRightBound : Vector){
+        this.cells = new Array(4);
         this.topLeftBound = topLeftBound;
-        this.topRightBound = topRightBound;
+        this.bottomRightBound = bottomRightBound;
+        this.centerBound = new Vector((this.topLeftBound.x + this.bottomRightBound.x) / 2, (this.topLeftBound.y + this.bottomRightBound.y) / 2);
     }
 
-    
+    GetNode(point : Vector) : QuadTreeNode{
+        let left = point.x < this.centerBound.x;
+        let top = point.y < this.centerBound.y;
+
+        // 0 2
+        // 1 3
+        let index = (top ? 0 : 1) + (left ? 0 : 2);
+        return this.GetCell(index);
+    }
+
+    private GetCell(index : number) : QuadTreeNode{
+        if(this.cells[index] == null){
+            this.cells[index] = new QuadTreeNode(
+                new Vector(
+                    index < 2 ? this.topLeftBound.x : this.centerBound.x,
+                    index % 2 == 0 ? this.topLeftBound.y : this.centerBound.y),
+                new Vector(
+                    index < 2 ? this.centerBound.x : this.bottomRightBound.x,
+                    index % 2 == 0 ? this.centerBound.y : this.bottomRightBound.y
+                ));
+        }
+
+        return this.cells[index];
+    }
 }
 
 class ComponentWrapper{
-    public component : IGameComponent;
+    public component : IPhysicsObject;
     public node : QuadTreeNode;
     
-    constructor(component : IGameComponent, node : QuadTreeNode){
+    constructor(component : IPhysicsObject, node : QuadTreeNode){
         this.component = component;
         this.node = node;
     }

@@ -1,0 +1,15 @@
+{
+  "version": "0.2.1",
+  "tasks": [
+    {
+      "taskName": "task-bouncyballs",
+      "appliesTo": "/",
+      "type": "launch"
+    },
+    {
+      "taskName": "task-bouncyballs",
+      "appliesTo": "/",
+      "type": "launch"
+    }
+  ]
+}

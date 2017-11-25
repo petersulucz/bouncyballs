@@ -251,6 +251,55 @@ class PhysicsController {
     }
 }
 PhysicsController.G = 0.006;
+class QuadTree {
+    constructor(maxLevels, size) {
+        this.maxLevels = maxLevels;
+        this.root = new QuadTreeNode(new Vector(), size.clone());
+        this.components = new Array();
+    }
+    getRoot() {
+        return this.root;
+    }
+    add(component) {
+    }
+    getFittingNode(component) {
+        let bounds = component.getBounds();
+        return null;
+    }
+}
+class QuadTreeNode {
+    constructor(topLeftBound, topRightBound) {
+        this.topLeftBound = topLeftBound;
+        this.topRightBound = topRightBound;
+    }
+}
+class ComponentWrapper {
+    constructor(component, node) {
+        this.component = component;
+        this.node = node;
+    }
+}
+class QuadTreeDrawer {
+    constructor(tree) {
+        this.tree = tree;
+    }
+    update(context) {
+        return false;
+    }
+    draw(context) {
+        context.graphics.beginPath();
+        context.graphics.fillStyle = this.color;
+        context.graphics.ellipse(this.position.x, this.position.y, this.radius, this.radius, 0, 0, Math.PI * 2);
+        context.graphics.fill();
+        context.graphics.closePath();
+    }
+    getBounds() {
+    }
+    collisionNotify(distance, component) {
+    }
+    applyForce(force) {
+    }
+}
 class UpdateContext {
     constructor(deltaMS, width, height, currentTime) {
         this.deltaMilliseconds = deltaMS;

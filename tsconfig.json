@@ -3,6 +3,6 @@
         "target": "es2015",
         "module": "commonjs",
         "sourceMap": false,
-        "outFile": "app.js"
+      "outFile": "app.js"
     }
 }

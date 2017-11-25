@@ -1,4 +1,4 @@
-class Ball implements IGameComponent{
+class Ball implements IGameComponent, IPhysicsObject{
 
     protected position : Vector; 
     protected velocity : Vector;

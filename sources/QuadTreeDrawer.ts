@@ -26,7 +26,7 @@ class QuadTreeDrawer implements IGameComponent{
     }
 
     getBounds() : BoundingCircle{
-
+        return new BoundingCircle(this.tree.getRoot().)
     }
 
     collisionNotify(distance : number, component : IGameComponent){
