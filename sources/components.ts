@@ -3,13 +3,21 @@ class Helpers{
         return position.x - radius >= topleft.x && position.y - radius >= topleft.y && position.x + radius <= bottomRight.x && position.y + radius <= bottomRight.y;
     }
 
-    static RandomColor() : string {
-        let r = Math.random() * 256;
-        let b = Math.random() * 256;
-        let g = Math.random() * 256;
+    static RandomColor(red : number = undefined, green : number = undefined, blue : number = undefined) : string {
+        let r = red != undefined ? red : Math.random() * 256;
+        let b = blue != undefined ? blue : Math.random() * 256;
+        let g = green != undefined ? green : Math.random() * 256;
         let a = 0.4;
 
         return "rgba(" + r + "," + g + "," + b + "," + a + ")";
+    }
+
+    static Remove<T>(array : Array<T>, item : T){
+        let index = array.indexOf(item);
+        if(index == -1){
+            throw "Element does not exist";
+        }
+        array.splice(index, 1);
     }
 }
 
@@ -25,6 +33,11 @@ class Vector{
     static dist(a : Vector, b : Vector) : number{
         return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
     }
+
+    static dot(a : Vector, b : Vector) : number{
+        return a.x * b.x + a.y * b.y;
+    }
+
 
     add(v : Vector) : Vector{
         return new Vector(v.x + this.x, v.y + this.y);
@@ -67,6 +80,14 @@ class BoundingCircle{
 
         this.mass = Math.PI * this.radius * this.radius;
     }
+
+    topLeft() : Vector{
+        return new Vector(this.position.x - this.radius, this.position.y - this.radius);
+    }
+
+    bottomRight() : Vector{
+        return new Vector(this.position.x + this.radius, this.position.y + this.radius);
+    }
 }
 
 class PhysicsProperties{
@@ -74,17 +95,44 @@ class PhysicsProperties{
     velocity : Vector;
     acceleration : Vector;
     radius : number;
+    mass : number;
 
     constructor(){
         this.position = new Vector();
         this.velocity = new Vector();
         this.radius = 0;
+        this.mass = 100000;
         this.acceleration = new Vector();
     }
     
     getBounds() : BoundingCircle{
         let circle = new BoundingCircle(this.position, this.radius);
         return circle;
+    }
+
+    processColission(other : PhysicsProperties)
+    {
+        let mcalc = this.mass * 2 / (this.mass + other.mass);
+
+        let postDiff = this.position.subtract(other.position);
+        let velocityDiff = this.velocity.subtract(other.velocity);
+        let dot = Vector.dot(velocityDiff, postDiff);
+        let magnitude = postDiff.magnitude();
+
+        let scalar = mcalc * dot / (magnitude * magnitude);
+
+        let v1 = this.velocity.subtract(postDiff.scale(scalar));
+    
+        postDiff = other.position.subtract(this.position);
+        velocityDiff = other.velocity.subtract(this.velocity);
+        dot = Vector.dot(velocityDiff, postDiff);
+        magnitude = postDiff.magnitude();
+        scalar = mcalc * dot / (magnitude * magnitude);
+
+        let v2 = other.velocity.subtract(postDiff.scale(scalar));
+
+        this.velocity = v1;
+        other.velocity = v2;
     }
 }
 
@@ -120,14 +168,22 @@ abstract class DrawableGameComponent extends GameComponent{
     abstract draw(context : DrawContext);
 }
 
-class PhysicsController{
+class PhysicsController extends GameComponent{
     
     readonly quadTree : QuadTree;
     readonly compontents : Array<PhysicsProperties>
 
     constructor(worldSize : Vector){
+        super();
         this.quadTree = new QuadTree(10, worldSize);
         this.compontents = new Array<PhysicsProperties>();
+    }
+
+    update(context : UpdateContext) : boolean{
+
+        this.quadTree.Update();
+
+        return false;
     }
 
     add(item : PhysicsProperties){
@@ -156,7 +212,7 @@ class Ball extends DrawableGameComponent{
         let position = new Vector(Math.random() * (bounds.x - radius) + radius, Math.random() * (bounds.y - radius) + radius);
         let velocity = new Vector((Math.random() * (maxVelocity.x - minVelocity.x) + minVelocity.x) * (Math.random() > 0.5 ? 1 : -1 ), (Math.random() * (maxVelocity.y - minVelocity.y) + minVelocity.y) * (Math.random() > 0.5 ? 1 : -1 ));
 
-        return new Ball(position, velocity, radius, Helpers.RandomColor());
+        return new Ball(position, velocity, radius, Helpers.RandomColor(0, 0));
     }
 
     update(context : UpdateContext) : boolean{
@@ -205,7 +261,7 @@ class QuadTree
 
     constructor(maxLevels : number, size : Vector){
         this.maxLevels = maxLevels;
-        this.root = new QuadTreeNode(1, new Vector(), size.clone());
+        this.root = new QuadTreeNode(1, null, new Vector(), size.clone());
 
         this.components = new Array<ComponentWrapper>();
     }
@@ -215,15 +271,67 @@ class QuadTree
     }
 
     add(component : PhysicsProperties){
-        this.getFittingNode(component);
+        let wrapper = new ComponentWrapper(component, null);
+        this.components.push(wrapper);
+        this.getFittingNode(wrapper);
     }
 
-    private getFittingNode(component : PhysicsProperties) : QuadTreeNode{
-        let bounds = component.getBounds()
-        let node = this.root.GetNode(bounds.position);
-        while(node.depth < this.maxLevels){
-            node = node.GetNode(bounds.position);
+    Update(){
+        for(let i = 0; i < this.components.length; i++){
+            let component = this.components[i];
+
+            this.root.GetNode(component);
         }
+
+        this.UpdateRecursive(this.root, new Array<PhysicsProperties>());
+    }
+
+    private UpdateRecursive(node : QuadTreeNode, list : Array<PhysicsProperties>){
+
+        if(node == null){
+            return;
+        }
+
+        for(let i = 0; i < node.components.length; i++){
+            for(let c = i + 1; c < node.components.length; c++){
+                this.TestCollision(node.components[i].component, node.components[c].component);
+            }
+
+            for(let c = 0; c < list.length; c++){
+                this.TestCollision(node.components[i].component, list[c]);
+            }
+        }
+
+        for(let i = 0; i < node.components.length; i++){
+            list.push(node.components[i].component);
+        }
+
+        this.UpdateRecursive(node.TopLeft, list);
+        this.UpdateRecursive(node.BottomLeft, list);
+        this.UpdateRecursive(node.TopRight, list);
+        this.UpdateRecursive(node.BottomRight, list);
+
+        for(let i = 0; i < node.components.length; i++){
+            list.pop();
+        }
+    }
+
+    private TestCollision(a : PhysicsProperties, b : PhysicsProperties)
+    {
+        let boundsA = a.getBounds();
+        let boundsB = b.getBounds();
+
+        let dist = Vector.dist(boundsA.position, boundsB.position);
+
+        if(dist > boundsA.radius + boundsB.radius){
+            return;
+        }
+
+        b.processColission(a);
+    }
+
+    private getFittingNode(component : ComponentWrapper) : QuadTreeNode{
+        let node = this.root.GetNode(component);
         return node;
     }
 }
@@ -240,13 +348,17 @@ class QuadTreeNode
     public readonly topLeftBound : Vector;
     public readonly bottomRightBound : Vector;
     public readonly centerBound : Vector;
+    public readonly components : Array<ComponentWrapper>
+    public readonly parent : QuadTreeNode;
 
-    constructor(depth : number, topLeftBound : Vector, bottomRightBound : Vector){
+    constructor(depth : number, parent : QuadTreeNode, topLeftBound : Vector, bottomRightBound : Vector){
         this.depth = depth;
         this.cells = new Array(4);
         this.topLeftBound = topLeftBound;
         this.bottomRightBound = bottomRightBound;
         this.centerBound = new Vector((this.topLeftBound.x + this.bottomRightBound.x) / 2, (this.topLeftBound.y + this.bottomRightBound.y) / 2);
+        this.components = new Array<ComponentWrapper>();
+        this.parent = parent;
     }
 
     get TopLeft():QuadTreeNode{
@@ -265,20 +377,53 @@ class QuadTreeNode
         return this.cells[3];
     }
 
-    GetNode(point : Vector) : QuadTreeNode{
+    GetNode(wrapper : ComponentWrapper) : QuadTreeNode{
+        let bounds = wrapper.component.getBounds();
+        let tlNode = this.GetCellIndex(bounds.topLeft());
+        let brNode = this.GetCellIndex(bounds.bottomRight());
+        if(tlNode == brNode){
+            return this.GetCell(tlNode).GetNode(wrapper);
+        }
+
+        this.components.push(wrapper);
+
+        if(wrapper.node != null){
+            Helpers.Remove(wrapper.node.components, wrapper);
+            wrapper.node.Prune();
+        }
+
+        wrapper.node = this;
+        return this;
+    }
+
+    private GetCellIndex(point : Vector){
         let left = point.x < this.centerBound.x;
         let top = point.y < this.centerBound.y;
 
         // 0 2
         // 1 3
-        let index = (top ? 0 : 1) + (left ? 0 : 2);
-        return this.GetCell(index);
+        return (top ? 0 : 1) + (left ? 0 : 2);
+    }
+
+    private Prune(){
+        if(this.components.length > 0 || this.parent == null){
+            return;
+        }
+
+        this.parent.PruneChild(this);
+    }
+
+    private PruneChild(child : QuadTreeNode){
+        let index = this.cells.indexOf(child);
+        this.cells[index] = null;
+        this.Prune();
     }
 
     private GetCell(index : number) : QuadTreeNode{
         if(this.cells[index] == null){
             this.cells[index] = new QuadTreeNode(
                 this.depth + 1,
+                this,
                 new Vector(
                     index < 2 ? this.topLeftBound.x : this.centerBound.x,
                     index % 2 == 0 ? this.topLeftBound.y : this.centerBound.y),
@@ -319,7 +464,6 @@ class QuadTreeDrawer extends DrawableGameComponent{
     draw(context : DrawContext){
         context.graphics.beginPath();
         context.graphics.strokeStyle = 'red';
-        
         this.drawRecursive(this.tree.getRoot(), context.graphics);
         context.graphics.closePath();
     }
@@ -405,11 +549,11 @@ class GameController
     }
 
     private update(){
-        //this.phsyicsController.processCollisions(this.components);
-
         let now = Date.now();
         let updateContext = new UpdateContext(now - this.previousContext.currentTime, this.canvas.width, this.canvas.height, now);
         this.previousContext = updateContext;
+
+        this.phsyicsController.update(updateContext);
 
         for(let i = this.components.length - 1; i >= 0; i--){
             if(this.components[i].update(updateContext)){

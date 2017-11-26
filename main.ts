@@ -36,7 +36,7 @@ class Main
     }
 
     public AddRandomBall(){
-        var ball = Ball.CreateRandom(new Vector(this.canvas.width, this.canvas.height), 10, 25, new Vector(30, 30), new Vector(180, 180));
+        var ball = Ball.CreateRandom(new Vector(this.canvas.width, this.canvas.height), 5, 20, new Vector(30, 30), new Vector(180, 180));
         this.controller.addComponent(ball);
     }
 
