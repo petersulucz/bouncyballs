@@ -30,14 +30,13 @@ class Main
         }
 
         this.canvas.onclick = (event) => {
-            let ball = new GrowingBall(new Vector(event.offsetX - 15, event.offsetY - 15), new Vector(), 15, 90, 'red')
-            ball.collisionNotify(0, null);
+            let ball = new Ball(new Vector(event.offsetX - 15, event.offsetY - 15), new Vector(), 15, 'red')
             this.controller.addComponent(ball);
         }
     }
 
     public AddRandomBall(){
-        var ball = GrowingBall.CreateRandom(new Vector(this.canvas.width, this.canvas.height), 10, 25, new Vector(30, 30), new Vector(180, 180));
+        var ball = Ball.CreateRandom(new Vector(this.canvas.width, this.canvas.height), 10, 25, new Vector(30, 30), new Vector(180, 180));
         this.controller.addComponent(ball);
     }
 
