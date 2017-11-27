@@ -1,8 +1,6 @@
+/** Helper methods... */
 class Helpers{
-    static BoxContains(topleft: Vector, bottomRight: Vector, position: Vector, radius : number){
-        return position.x - radius >= topleft.x && position.y - radius >= topleft.y && position.x + radius <= bottomRight.x && position.y + radius <= bottomRight.y;
-    }
-
+    /** Create a random color. But can define some constants. */
     static RandomColor(red : number = undefined, green : number = undefined, blue : number = undefined) : string {
         let r = red != undefined ? red : Math.random() * 256;
         let b = blue != undefined ? blue : Math.random() * 256;
@@ -12,6 +10,7 @@ class Helpers{
         return "rgba(" + r + "," + g + "," + b + "," + a + ")";
     }
 
+    /** Remove an item from an array. */
     static Remove<T>(array : Array<T>, item : T){
         let index = array.indexOf(item);
         if(index == -1){
@@ -213,12 +212,14 @@ class PhysicsController extends GameComponent{
         return false;
     }
 
+    /** Add an item. */
     add(item : PhysicsProperties){
         this.compontents.push(item);
         this.quadTree.add(item);
     }
 }
 
+/** A ball on the screen. */
 class Ball extends DrawableGameComponent{
     
     physics : PhysicsProperties;
@@ -248,14 +249,13 @@ class Ball extends DrawableGameComponent{
         this.physics.velocity = this.physics.velocity.add(this.physics.acceleration);
         this.physics.acceleration = new Vector()
 
+        /** Bounce off the walls. */
         if(this.physics.position.x - this.physics.radius <= 0 || this.physics.position.x + this.physics.radius >= context.width){
             this.physics.velocity.x *= -1;
-            //this.physics.position.x = Math.max(this.physics.radius, Math.min(context.width - this.physics.radius, this.physics.position.x);
         }
 
         if(this.physics.position.y - this.physics.radius <= 0 || this.physics.position.y + this.physics.radius >= context.height){
             this.physics.velocity.y *= -1;
-            //this.physics.position.x = Math.max(this.physics.radius, Math.min(context.width - this.physics.radius, this.physics.position.x);
         }
 
         // Update the movement
@@ -280,14 +280,22 @@ class Ball extends DrawableGameComponent{
     }
 }
 
+/** A quadtree */
 class QuadTree
 {
-    private maxLevels : number;
-    readonly size : Vector;
+    /** The maximum depth. */
+    private readonly maxLevels : number;
 
-    private root : QuadTreeNode;
+    /** The root node. */
+    private readonly root : QuadTreeNode;
 
-    private components : Array<ComponentWrapper>
+    /** The size of the map. */
+    private readonly size : Vector;
+
+    /** The list of components. */
+    private readonly components : Array<ComponentWrapper>
+
+    public collisionsProcessed : number;
 
     constructor(maxLevels : number, size : Vector){
         this.maxLevels = maxLevels;
@@ -296,16 +304,19 @@ class QuadTree
         this.components = new Array<ComponentWrapper>();
     }
 
+    /** Get the root node. */
     getRoot() : QuadTreeNode{
         return this.root;
     }
 
+    /** Add a component to the tree. */
     add(component : PhysicsProperties){
         let wrapper = new ComponentWrapper(component, null);
         this.components.push(wrapper);
         this.getFittingNode(wrapper);
     }
 
+    /** Update the entire tree. */
     Update(){
         for(let i = 0; i < this.components.length; i++){
             let component = this.components[i];
@@ -313,45 +324,59 @@ class QuadTree
             this.root.GetNode(component);
         }
 
+        this.collisionsProcessed = 0;
         this.UpdateRecursive(this.root, new Array<PhysicsProperties>());
     }
 
+    /** Update each node. */
     private UpdateRecursive(node : QuadTreeNode, list : Array<PhysicsProperties>){
 
+        /** Base case, exit. */
         if(node == null){
             return;
         }
 
+        /** For every component on the node. */
         for(let i = 0; i < node.components.length; i++){
+
+            /** Process every other component on the node. */
             for(let c = i + 1; c < node.components.length; c++){
                 this.TestCollision(node.components[i].component, node.components[c].component);
             }
 
+            /** Process everything which is currently in the list. AKA on a parent node. */
             for(let c = 0; c < list.length; c++){
                 this.TestCollision(node.components[i].component, list[c]);
             }
         }
 
+        /** Add everything to the list, so child nodes can check for collisions against them. */
         for(let i = 0; i < node.components.length; i++){
             list.push(node.components[i].component);
         }
 
+        /** Update all child nodes. */
         this.UpdateRecursive(node.TopLeft, list);
         this.UpdateRecursive(node.BottomLeft, list);
         this.UpdateRecursive(node.TopRight, list);
         this.UpdateRecursive(node.BottomRight, list);
 
+        /** Pop everything off the list to continue upwards. */
         for(let i = 0; i < node.components.length; i++){
             list.pop();
         }
     }
 
+    /** Test a collision between two physics objexts. */
     private TestCollision(a : PhysicsProperties, b : PhysicsProperties)
     {
         let boundsA = a.getBounds();
         let boundsB = b.getBounds();
 
         let dist = Vector.dist(boundsA.position, boundsB.position);
+
+        // Update the count.
+        this.collisionsProcessed++;
 
         if(dist > boundsA.radius + boundsB.radius){
             return;
@@ -360,26 +385,38 @@ class QuadTree
         b.processColission(a);
     }
 
+    /** This method is stupid. delete it. */
     private getFittingNode(component : ComponentWrapper) : QuadTreeNode{
         let node = this.root.GetNode(component);
         return node;
     }
 }
 
+/** A node of the quad tree. */
 class QuadTreeNode
 {
-    private topLeft : QuadTreeNode;
-    private topRight : QuadTreeNode;
-    private bottomLeft : QuadTreeNode;
-    private bottomRight : QuadTreeNode;
-    private cells : Array<QuadTreeNode>;
+    /** The child nodes. */
+    private readonly cells : Array<QuadTreeNode>;
+
+    /** The maximum depth. */
     private readonly maxDepth : number;
 
+    /** The current depth */
     public readonly depth : number;
+
+    /** The top left corner of the node. */
     public readonly topLeftBound : Vector;
+
+    /** The bottom right corner of the node. */
     public readonly bottomRightBound : Vector;
+
+    /** The center of the node. */
     public readonly centerBound : Vector;
+
+    /** The components attached to the node. */
     public readonly components : Array<ComponentWrapper>
+
+    /** The parent tree node. */
     public readonly parent : QuadTreeNode;
 
     constructor(depth : number, maxDepth : number, parent : QuadTreeNode, topLeftBound : Vector, bottomRightBound : Vector){
@@ -409,6 +446,7 @@ class QuadTreeNode
         return this.cells[3];
     }
 
+    /** Get the deepest possible node for a component on the tree. */
     GetNode(wrapper : ComponentWrapper) : QuadTreeNode{
         let bounds = wrapper.component.getBounds();
         let tlNode = this.GetCellIndex(bounds.topLeft());
@@ -418,11 +456,15 @@ class QuadTreeNode
             return this.GetCell(tlNode).GetNode(wrapper);
         }
 
-        this.components.push(wrapper);
+        /** If the cell has left the current node. Then re-organize and prune */
+        if(wrapper.node != this)
+        {
+            this.components.push(wrapper);
 
-        if(wrapper.node != null){
-            Helpers.Remove(wrapper.node.components, wrapper);
-            wrapper.node.Prune();
+            if(wrapper.node != null){
+                Helpers.Remove(wrapper.node.components, wrapper);
+                wrapper.node.Prune();
+            }
         }
 
         wrapper.node = this;
@@ -590,6 +632,10 @@ class GameController
         return this.drawables.length;
     }
 
+    get Physics() : PhysicsController{
+        return this.phsyicsController;
+    }
+
     private update(){
         let now = Date.now();
         let updateContext = new UpdateContext(now - this.previousContext.currentTime, this.canvas.width, this.canvas.height, now);
@@ -639,6 +685,7 @@ class Diagnostics extends DrawableGameComponent{
         context.graphics.fillStyle = 'white';
         context.graphics.fillText("updateables: " + this.gameController.UpdateablesCount, this.startPosition.x, this.startPosition.y);
         context.graphics.fillText("draweables: " + this.gameController.UpdateablesCount, this.startPosition.x, this.startPosition.y + 16);
+        context.graphics.fillText("collisions: " + this.gameController.Physics.quadTree.collisionsProcessed, this.startPosition.x, this.startPosition.y + 32);
         context.graphics.closePath();
     }    
 }
