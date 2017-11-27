@@ -203,7 +203,7 @@ class PhysicsController extends GameComponent{
 
     constructor(worldSize : Vector){
         super();
-        this.quadTree = new QuadTree(4, worldSize);
+        this.quadTree = new QuadTree(8, worldSize);
         this.compontents = new Array<PhysicsProperties>();
     }
 
@@ -250,10 +250,12 @@ class Ball extends DrawableGameComponent{
 
         if(this.physics.position.x - this.physics.radius <= 0 || this.physics.position.x + this.physics.radius >= context.width){
             this.physics.velocity.x *= -1;
+            //this.physics.position.x = Math.max(this.physics.radius, Math.min(context.width - this.physics.radius, this.physics.position.x);
         }
 
         if(this.physics.position.y - this.physics.radius <= 0 || this.physics.position.y + this.physics.radius >= context.height){
             this.physics.velocity.y *= -1;
+            //this.physics.position.x = Math.max(this.physics.radius, Math.min(context.width - this.physics.radius, this.physics.position.x);
         }
 
         // Update the movement
@@ -412,7 +414,7 @@ class QuadTreeNode
         let tlNode = this.GetCellIndex(bounds.topLeft());
         let brNode = this.GetCellIndex(bounds.bottomRight());
 
-        if(tlNode == brNode || this.maxDepth == this.depth){
+        if(tlNode == brNode && this.depth < this.maxDepth){
             return this.GetCell(tlNode).GetNode(wrapper);
         }
 
