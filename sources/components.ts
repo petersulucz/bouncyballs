@@ -21,6 +21,7 @@ class Helpers{
     }
 }
 
+/** A vector */
 class Vector{
     public x : number;
     public y : number;
@@ -30,55 +31,61 @@ class Vector{
         this.y = y;
     }
 
+    /** The distance between two vectors. */
     static dist(a : Vector, b : Vector) : number{
         return Math.sqrt(Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2));
     }
 
+    /** The dot product of two vectors. */
     static dot(a : Vector, b : Vector) : number{
         return a.x * b.x + a.y * b.y;
     }
 
-
+    /** Add this to another vector. And a new vector with the product. */
     add(v : Vector) : Vector{
         return new Vector(v.x + this.x, v.y + this.y);
     }
 
+    /** Subtract another vector from this one, and return a new vector with the product. */
     subtract(v : Vector) : Vector {
         return new Vector(this.x - v.x, this.y - v.y);
     }
 
+    /** Multiply this vector by a scale, and return new vector with the product. */
     scale(scale : number){
         return new Vector(this.x * scale, this.y * scale);
     }
 
+    // Copy this vector
     clone(){
         return new Vector(this.x, this.y);
     }
 
+    /** Flip this vector around. */
     invert(){
         return new Vector(-1 * this.x, -1 * this.y);
     }
 
+    /** Find the magnitude of this vector. */
     magnitude(){
         return Math.sqrt(this.x * this.x + this.y * this.y);
     }
 
+    /** Normalize this vector to a length of 1. */
     normalize(){
         var mag = this.magnitude();
         return new Vector(this.x / mag, this.y / mag);
     }
 }
 
+/** The bounding circle class. */
 class BoundingCircle{
     readonly position : Vector;
     readonly radius : number;
-    readonly mass : number;
 
     constructor(position : Vector, radius : number){
-        this.position = position.clone();
+        this.position = position;
         this.radius = radius;
-
-        this.mass = Math.PI * this.radius * this.radius;
     }
 
     topLeft() : Vector{
@@ -90,6 +97,7 @@ class BoundingCircle{
     }
 }
 
+/** Properties for physics */
 class PhysicsProperties{
     position : Vector;
     velocity : Vector;
@@ -105,11 +113,13 @@ class PhysicsProperties{
         this.acceleration = new Vector();
     }
     
+    /** Get the bounding circle for this object. */
     getBounds() : BoundingCircle{
         let circle = new BoundingCircle(this.position, this.radius);
         return circle;
     }
 
+    /** A fully elastic collision between two circles. */
     processColission(other : PhysicsProperties)
     {
         let mcalc = this.mass * 2 / (this.mass + other.mass);
@@ -123,6 +133,7 @@ class PhysicsProperties{
 
         let v1 = this.velocity.subtract(postDiff.scale(scalar));
     
+        mcalc = other.mass * 2 / (this.mass + other.mass);
         postDiff = other.position.subtract(this.position);
         velocityDiff = other.velocity.subtract(this.velocity);
         dot = Vector.dot(velocityDiff, postDiff);
@@ -136,10 +147,19 @@ class PhysicsProperties{
     }
 }
 
+/** Context which is passed on each update. */
 class UpdateContext{
+
+    /** The milliseconds since the last update. */
     public readonly deltaMilliseconds : number;
+
+    /** The width of the land. */
     public readonly width : number;
+
+    /** The height of the land. */
     public readonly height : number;
+
+    /** The current time. */
     public readonly currentTime : number;
 
     constructor(deltaMS : number, width : number, height : number, currentTime : number){
@@ -150,7 +170,10 @@ class UpdateContext{
     }
 }
 
+/** Context passed to the draw call. */
 class DrawContext{
+
+    /** The graphics context. */
     public readonly graphics : CanvasRenderingContext2D;
 
     constructor(context : CanvasRenderingContext2D){
@@ -158,16 +181,21 @@ class DrawContext{
     }
 }
 
+/** An updateable class. */
 abstract class GameComponent{
+
+    /** Update. Return true if this item needs to be deleted. */
     abstract update(context : UpdateContext) : boolean; 
     
     public physics : PhysicsProperties;
 }
 
+/** A draweable class. */
 abstract class DrawableGameComponent extends GameComponent{
     abstract draw(context : DrawContext);
 }
 
+/** The physics controller. */
 class PhysicsController extends GameComponent{
     
     readonly quadTree : QuadTree;
@@ -175,14 +203,13 @@ class PhysicsController extends GameComponent{
 
     constructor(worldSize : Vector){
         super();
-        this.quadTree = new QuadTree(10, worldSize);
+        this.quadTree = new QuadTree(4, worldSize);
         this.compontents = new Array<PhysicsProperties>();
     }
 
+    /** Update the physics controller. Updates collisions and the quad tree */
     update(context : UpdateContext) : boolean{
-
         this.quadTree.Update();
-
         return false;
     }
 
@@ -203,6 +230,7 @@ class Ball extends DrawableGameComponent{
         this.physics.position = position;
         this.physics.velocity = velocity;
         this.physics.radius = radius;
+        this.physics.mass = Math.PI * radius * radius;
         this.color = color;
     }
 
@@ -261,7 +289,7 @@ class QuadTree
 
     constructor(maxLevels : number, size : Vector){
         this.maxLevels = maxLevels;
-        this.root = new QuadTreeNode(1, null, new Vector(), size.clone());
+        this.root = new QuadTreeNode(1, this.maxLevels, null, new Vector(), size.clone());
 
         this.components = new Array<ComponentWrapper>();
     }
@@ -343,6 +371,7 @@ class QuadTreeNode
     private bottomLeft : QuadTreeNode;
     private bottomRight : QuadTreeNode;
     private cells : Array<QuadTreeNode>;
+    private readonly maxDepth : number;
 
     public readonly depth : number;
     public readonly topLeftBound : Vector;
@@ -351,8 +380,9 @@ class QuadTreeNode
     public readonly components : Array<ComponentWrapper>
     public readonly parent : QuadTreeNode;
 
-    constructor(depth : number, parent : QuadTreeNode, topLeftBound : Vector, bottomRightBound : Vector){
+    constructor(depth : number, maxDepth : number, parent : QuadTreeNode, topLeftBound : Vector, bottomRightBound : Vector){
         this.depth = depth;
+        this.maxDepth = maxDepth;
         this.cells = new Array(4);
         this.topLeftBound = topLeftBound;
         this.bottomRightBound = bottomRightBound;
@@ -381,7 +411,8 @@ class QuadTreeNode
         let bounds = wrapper.component.getBounds();
         let tlNode = this.GetCellIndex(bounds.topLeft());
         let brNode = this.GetCellIndex(bounds.bottomRight());
-        if(tlNode == brNode){
+
+        if(tlNode == brNode || this.maxDepth == this.depth){
             return this.GetCell(tlNode).GetNode(wrapper);
         }
 
@@ -423,6 +454,7 @@ class QuadTreeNode
         if(this.cells[index] == null){
             this.cells[index] = new QuadTreeNode(
                 this.depth + 1,
+                this.maxDepth,
                 this,
                 new Vector(
                     index < 2 ? this.topLeftBound.x : this.centerBound.x,
@@ -482,7 +514,7 @@ class QuadTreeDrawer extends DrawableGameComponent{
         this.drawRecursive(node.BottomRight, graphics);
     }
 }
-        
+
 class GameController
 {
     private drawInterval: number;
@@ -548,6 +580,14 @@ class GameController
         }
     }
 
+    get UpdateablesCount() : number{
+        return this.components.length;
+    }
+
+    get DraweablesCount() : number{
+        return this.drawables.length;
+    }
+
     private update(){
         let now = Date.now();
         let updateContext = new UpdateContext(now - this.previousContext.currentTime, this.canvas.width, this.canvas.height, now);
@@ -572,4 +612,31 @@ class GameController
             this.drawables[i].draw(drawContenxt);
         }
     }
+}
+
+class Diagnostics extends DrawableGameComponent{
+
+    private readonly gameController : GameController;
+    private readonly startPosition : Vector;
+
+    constructor(gameController : GameController){
+        super()
+        this.gameController = gameController;
+
+        this.startPosition = new Vector(0, 16);
+
+    }
+
+    update(context : UpdateContext) : boolean{
+        return false;
+    }
+
+    draw(context : DrawContext){
+        context.graphics.beginPath();
+        context.graphics.font = '16px monospaced'
+        context.graphics.fillStyle = 'white';
+        context.graphics.fillText("updateables: " + this.gameController.UpdateablesCount, this.startPosition.x, this.startPosition.y);
+        context.graphics.fillText("draweables: " + this.gameController.UpdateablesCount, this.startPosition.x, this.startPosition.y + 16);
+        context.graphics.closePath();
+    }    
 }

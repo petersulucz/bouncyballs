@@ -36,8 +36,15 @@ class Main
     }
 
     public AddRandomBall(){
+        for(let i = 0; i < 20; i++){
         var ball = Ball.CreateRandom(new Vector(this.canvas.width, this.canvas.height), 5, 20, new Vector(30, 30), new Vector(180, 180));
         this.controller.addComponent(ball);
+        }
+    }
+
+    public EnableDiagnostics(){
+        let diagnostic = new Diagnostics(this.controller);
+        this.controller.addComponent(diagnostic);
     }
 
     private initializeCanvas(){
@@ -51,5 +58,6 @@ class Main
 function Run(){
     let m = new Main();
     m.initializeTest()
+    m.EnableDiagnostics();
     m.run();
 }
